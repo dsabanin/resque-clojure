@@ -27,7 +27,7 @@
   (dotimes [n (:max-workers @config)] (make-agent))
   (listen-to queues)
   (dosync (ref-set run-loop? true))
-  (.start (Thread. listen-loop))
+  (.start (Thread. listen-loop (str "Listening to " (prn-str queues))))
   (.addShutdownHook (Runtime/getRuntime)
                     (Thread. stop)))
 
