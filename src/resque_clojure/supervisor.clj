@@ -13,7 +13,7 @@
                    :poll-interval (* 5 1000)
                    :max-workers 1}))
 
-(declare release-worker reserve-worker make-agent listen-to listen-loop dispatch-jobs stop-dispatching-thread! create-dispatching-thread!)
+(declare release-worker reserve-worker make-agent listen-to build-listen-loop dispatch-jobs stop-dispatching-thread! create-dispatching-thread!)
 
 (defn configure [c]
   (swap! config merge c))
