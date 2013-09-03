@@ -1,4 +1,4 @@
-(defproject dsabanin/resque-clojure "0.3.1"
+(defproject dsabanin/resque-clojure "0.3.2"
   :description "Redis based library for asynchronous processing"
   :url "https://github.com/jxa/resque-clojure"
   :license {:name "The MIT License"
