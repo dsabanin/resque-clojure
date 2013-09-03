@@ -31,8 +31,8 @@
 
 (defn start
   ([queues]
-     (start queues {:listener-error-handler default-dispatching-error-handler}))
-  ([queues {:keys [listener-error-handler]}]
+     (start queues {:dispatching-error-handler default-dispatching-error-handler}))
+  ([queues {:keys [dispatching-error-handler]}]
      "start listening for jobs on queues (vector)."
      (dotimes [n (:max-workers @config)] (make-agent))
      (listen-to queues)
