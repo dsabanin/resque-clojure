@@ -13,7 +13,7 @@
                    :poll-interval (* 5 1000)
                    :max-workers 1}))
 
-(declare release-worker reserve-worker make-agent listen-to build-listen-loop dispatch-jobs stop-dispatching-thread! create-dispatching-thread!)
+(declare release-worker reserve-worker make-agent listen-to listen-loop handle-exceptions dispatch-jobs stop-dispatching-thread! create-dispatching-thread!)
 
 (defn configure [c]
   (swap! config merge c))
@@ -31,18 +31,18 @@
 
 (defn start
   ([queues]
-     (start queues {:dispatching-error-handler default-dispatching-error-handler}))
-  ([queues {:keys [dispatching-error-handler]}]
+     (start queues {:dispatcher-error-handler default-dispatching-error-handler}))
+  ([queues {:keys [dispatcher-error-handler]}]
      "start listening for jobs on queues (vector)."
      (dotimes [n (:max-workers @config)] (make-agent))
      (listen-to queues)
      (dosync (ref-set run-loop? true))
-     (create-dispatching-thread! queues listener-error-handler)
+     (create-dispatching-thread! queues dispatcher-error-handler)
      (.addShutdownHook (Runtime/getRuntime)
                        (Thread. stop))))
 
-(defn create-dispatching-thread! [queues listener-error-handler]
-  (let [thread (Thread. (build-listen-loop listener-error-handler)
+(defn create-dispatching-thread! [queues dispatcher-error-handler]
+  (let [thread (Thread. (handle-exceptions listen-loop dispatcher-error-handler)
                         (str "Dispatching from " (prn-str queues)))]
     (reset! dispatching-thread thread)
     (.start thread)))
@@ -60,20 +60,22 @@
 
 (defn dispatch-jobs []
   (when-let [worker-agent (reserve-worker)]
-    (let [msg (resque/dequeue @watched-queues)]
-      (if msg
-        (send-off worker-agent worker/work-on msg)
-        (release-worker worker-agent)))))
+    (if-let [msg (resque/dequeue @watched-queues)]
+      (send-off worker-agent worker/work-on msg)
+      (release-worker worker-agent))))
 
-(defn build-listen-loop [error-handler]
-  (fn []
-    (when @run-loop?
-      (try
-        (dispatch-jobs)
-        (catch Exception e
-          (error-handler e)))
-      (Thread/sleep (:poll-interval @config))
-      (recur))))
+(defn handle-exceptions [f handler]
+  (fn [& args]
+    (try
+      (apply f args)
+      (catch Exception e
+        (handler e)))))
+
+(defn listen-loop []
+  (when @run-loop?
+    (dispatch-jobs)
+    (Thread/sleep (:poll-interval @config))
+    (recur)))
 
 (defn make-agent []
   (let [worker-agent (agent {} :error-handler (fn [a e] (throw e)))]
