@@ -31,18 +31,19 @@
 
 (defn start
   ([queues]
-     (start queues {:dispatcher-error-handler default-dispatching-error-handler}))
-  ([queues {:keys [dispatcher-error-handler]}]
+     (start queues {:dispatcher-error-handler default-dispatching-error-handler
+                    :job-lookup-fn worker/lookup-fn}))
+  ([queues dispatch-opts]
      "start listening for jobs on queues (vector)."
      (dotimes [n (:max-workers @config)] (make-agent))
      (listen-to queues)
      (dosync (ref-set run-loop? true))
-     (create-dispatching-thread! queues dispatcher-error-handler)
+     (create-dispatching-thread! queues dispatch-opts)
      (.addShutdownHook (Runtime/getRuntime)
                        (Thread. stop))))
 
-(defn create-dispatching-thread! [queues dispatcher-error-handler]
-  (let [thread (Thread. (handle-exceptions listen-loop dispatcher-error-handler)
+(defn create-dispatching-thread! [queues {:keys [dispatcher-error-handler job-lookup-fn]}]
+  (let [thread (Thread. (handle-exceptions (partial listen-loop job-lookup-fn) dispatcher-error-handler)
                         (str "Dispatching from " (prn-str queues)))]
     (reset! dispatching-thread thread)
     (.start thread)))
@@ -58,10 +59,10 @@
   (if (= :error (:result new-state))
     (resque/report-error new-state)))
 
-(defn dispatch-jobs []
+(defn dispatch-jobs [job-lookup-fn]
   (when-let [worker-agent (reserve-worker)]
     (if-let [msg (resque/dequeue @watched-queues)]
-      (send-off worker-agent worker/work-on msg)
+      (send-off worker-agent (partial worker/work-on job-lookup-fn) msg)
       (release-worker worker-agent))))
 
 (defn handle-exceptions [f handler]
@@ -71,9 +72,9 @@
       (catch Exception e
         (handler e)))))
 
-(defn listen-loop []
+(defn listen-loop [job-lookup-fn]
   (when @run-loop?
-    (dispatch-jobs)
+    (dispatch-jobs job-lookup-fn)
     (Thread/sleep (:poll-interval @config))
     (recur)))
 
