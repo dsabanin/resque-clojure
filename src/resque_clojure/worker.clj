@@ -6,9 +6,9 @@
   (let [[namespace fun] (split namespaced-fn #"/")]
     (ns-resolve (symbol namespace) (symbol fun))))
 
-(defn work-on [state {:keys [func args queue] :as job}]
+(defn work-on [job-lookup-fn state {:keys [func args queue] :as job}]
   (try
-    (apply (lookup-fn func) args)
+    (apply (job-lookup-fn func) args)
     {:result :pass :job job :queue queue}
     (catch Exception e
       {:result :error :exception e :job job :queue queue :class func :args args})))
