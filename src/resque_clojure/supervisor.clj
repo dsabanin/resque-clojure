@@ -76,7 +76,7 @@
   (when @run-loop?
     (dispatch-jobs job-lookup-fn)
     (Thread/sleep (:poll-interval @config))
-    (recur)))
+    (recur job-lookup-fn)))
 
 (defn make-agent []
   (let [worker-agent (agent {} :error-handler (fn [a e] (throw e)))]
