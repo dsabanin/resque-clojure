@@ -13,7 +13,11 @@
                    :poll-interval (* 5 1000)
                    :max-workers 1}))
 
-(declare release-worker reserve-worker make-agent listen-to listen-loop handle-exceptions dispatch-jobs stop-dispatching-thread! create-dispatching-thread!)
+(declare release-worker reserve-worker make-agent listen-to listen-loop handle-exceptions dispatch-jobs stop-dispatching-thread! create-dispatching-thread! default-dispatching-error-handler)
+
+(def ^{:private true} default-opts
+  {:dispatcher-error-handler default-dispatching-error-handler
+   :job-lookup-fn worker/lookup-fn})
 
 (defn configure [c]
   (swap! config merge c))
@@ -30,17 +34,16 @@
   (throw e))
 
 (defn start
-  ([queues]
-     (start queues {:dispatcher-error-handler default-dispatching-error-handler
-                    :job-lookup-fn worker/lookup-fn}))
-  ([queues dispatch-opts]
+  ([queues] (start queues {}))
+  ([queues opts]
      "start listening for jobs on queues (vector)."
-     (dotimes [n (:max-workers @config)] (make-agent))
-     (listen-to queues)
-     (dosync (ref-set run-loop? true))
-     (create-dispatching-thread! queues dispatch-opts)
-     (.addShutdownHook (Runtime/getRuntime)
-                       (Thread. stop))))
+     (let [dispatch-opts (merge default-opts opts)]
+       (dotimes [n (:max-workers @config)] (make-agent))
+       (listen-to queues)
+       (dosync (ref-set run-loop? true))
+       (create-dispatching-thread! queues dispatch-opts)
+       (.addShutdownHook (Runtime/getRuntime)
+                         (Thread. stop)))))
 
 (defn create-dispatching-thread! [queues {:keys [dispatcher-error-handler job-lookup-fn]}]
   (let [thread (Thread. (handle-exceptions (partial listen-loop job-lookup-fn) dispatcher-error-handler)
