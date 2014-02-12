@@ -12,7 +12,7 @@
      :password
      :uri
      :database
-     :timeout
+     :timeout - in milliseconds
      :namespace
      :max-shutdown-wait
      :poll-interval
