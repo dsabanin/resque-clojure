@@ -47,9 +47,10 @@
 
 (defmacro with-connection [& body]
   `(binding [redis (get-connection)]
-     (let [result# ~@body]
-       (.returnResource @pool redis)
-       result#)))
+     (try
+       (do ~@body)
+       (finally
+         (.returnResource @pool redis)))))
 
 (defmacro defcommand [cmd args & body]
   `(defn ~cmd ~args
